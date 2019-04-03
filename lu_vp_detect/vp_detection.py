@@ -14,17 +14,20 @@ class vp_detection(object):
         length_thresh - Line segment detector threshold (default=30)
         principal_point - Principal point of the image (in pixels)
         focal_length - Focal length of the camera (in pixels)
+        seed - Seed for reproducibility due to RANSAC
     Class attributes -
         vps - The three VPs for the x, y and z directions using the
         right-handed coordinate system
     """
 
     def __init__(self, length_thresh=30, principal_point=None,
-                 focal_length=1500):
+                 focal_length=1500, seed=None):
         self._length_thresh = length_thresh
         self._principal_point = principal_point
         self._focal_length = focal_length
         self._angle_thresh = np.pi / 30 # For displaying debug image
+        self._vps = None # For storing the VPs in 3D space
+        self._vps_2D = None # For storing the VPs in 2D space
         self.__img = None # Stores the image locally
         self.__clusters = None # Stores which line index corresponds to what VP
         self.__tol = 1e-8 # Tolerance for floating point comparison
@@ -32,6 +35,7 @@ class vp_detection(object):
         self.__lines = None # Stores the line detections internally
         self.__zero_value = 0.001 # Threshold to check augmented coordinate
                                   # Anything less than __tol gets set to this
+        self.__seed = seed # Set seed for reproducibility
         noise_ratio = 0.5  # Outlier/inlier ratio for RANSAC estimation
         # Probability of all samples being inliers
         p = (1.0 / 3.0) * ((1.0 - noise_ratio) ** 2.0)
@@ -86,6 +90,22 @@ class vp_detection(object):
 
         self._focal_length = value
 
+    @property
+    def vps(self):
+        """
+        Vanishing points of the image in 3D space. Each row is a point
+        and each column is a component / coordinate
+        """
+        return self._vps
+
+    @property
+    def vps_2D(self):
+        """
+        Vanishing points of the image in 2D image coordinates. Each row
+        is a point and each column is a component / coordinate
+        """
+        return self._vps_2D
+
     def __detect_lines(self, img):
         # Convert to grayscale if required
         if len(img.shape) == 3:
@@ -100,10 +120,17 @@ class vp_detection(object):
         # Returns a NumPy array of type N x 1 x 4 of float32
         # such that the 4 numbers in the last dimension are (x1, y1, x2, y2)
         # These denote the start and end positions of a line
-        lines = lsd.detect(img_copy, None, self._length_thresh)[0]
+        lines = lsd.detect(img_copy)[0]
 
         # Remove singleton dimension
         lines = lines[:,0]
+
+        # Filter out the lines whose length is lower than the threshold
+        dx = lines[:, 2] - lines[:, 0]
+        dy = lines[:, 3] - lines[:, 1]
+        lengths = np.sqrt(dx*dx + dy*dy)
+        mask = lengths >= self._length_thresh
+        lines = lines[mask]
 
         # Store the lines internally
         self.__lines = lines
@@ -133,7 +160,7 @@ class vp_detection(object):
         cross_p = np.cross(p1, p2)
         dx = p1[:, 0] - p2[:, 0]
         dy = p1[:, 1] - p2[:, 1]
-        lengths = np.sqrt(dx**2.0 + dy**2.0)
+        lengths = np.sqrt(dx*dx + dy*dy)
         orientations = np.arctan2(dy, dx)
 
         # Perform wraparound - [-pi, pi] --> [0, pi]
@@ -153,10 +180,17 @@ class vp_detection(object):
             dtype=np.float32)
 
         i = 0
+
+        if self.__seed is not None:
+            gen = np.random.RandomState(self.__seed)
+
         # For each iteration...
         while i < self.__ransac_iter:
             # Get two random indices
-            (idx1, idx2) = np.random.permutation(N)[:2]
+            if self.__seed is not None:
+                (idx1, idx2) = gen.permutation(N)[:2]
+            else:
+                (idx1, idx2) = np.random.permutation(N)[:2]
 
             # Get the first VP proposal in the image
             vp1_img = np.cross(cross_p[idx1], cross_p[idx2])
@@ -212,7 +246,7 @@ class vp_detection(object):
 
         # Determine number of bins for latitude and longitude
         bin_size = np.pi / 180.0
-        lat_span = np.pi / 2
+        lat_span = np.pi / 2.0
         long_span = 2.0 * np.pi
         num_bins_lat = int(lat_span / bin_size)
         num_bins_lon = int(long_span / bin_size)
@@ -312,23 +346,45 @@ class vp_detection(object):
         # Find best hypothesis by determining which triplet has the largest
         # votes
         best_idx = np.argmax(votes)
-
-        # Finally, sort the VPs based on x coordinate mapped in 2D
         final_vps = vp_hypos[best_idx]
-        vp2D = final_vps[:,:2] / final_vps[:,-1][:,None]
-        vp2D += self._principal_point
-        ind_sort = np.lexsort((vp2D[:,1], vp2D[:,0]))
-        return final_vps[ind_sort]
+        vps_2D = self._focal_length * (final_vps[:,:2] / final_vps[:,-1][:,None])
+        vps_2D += self._principal_point
 
-    def __lines_to_vps(self, vps_hypos, final_vps):
+        # Find the coordinate with the largest vertical value
+        # This will be the last column of the output
+        z_idx = np.argmax(np.abs(vps_2D[:,1]))
+        ind = np.arange(3).astype(np.int)
+        mask = np.ones(3, dtype=np.bool)
+        mask[z_idx] = False
+        ind = ind[mask]
+
+        # Next, figure out which of the other two coordinates has the smallest
+        # x coordinate - this would be the left leaning VP
+        vps_trim = vps_2D[mask]
+        x_idx = np.argmin(vps_trim[:, 0])
+        x_idx = ind[x_idx]
+
+        # Finally get the right learning VP
+        mask[x_idx] = False
+        x2_idx = np.argmax(mask)
+
+        # Re-arrange the order
+        # Right VP is first - x-axis would be to the right
+        # Left VP is second - y-axis would be to the left
+        # Vertical VP is third - z-axis would be vertical
+        final_vps = final_vps[[x2_idx, x_idx, z_idx], :]
+        vps_2D = vps_2D[[x2_idx, x_idx, z_idx], :]
+
+        # Save for later
+        self._vps = final_vps
+        self._vps_2D = vps_2D
+        return final_vps
+
+    def __cluster_lines(self, vps_hypos):
         """
         Groups the lines based on which VP they contributed to.
         Primarily for display purposes only when debugging the algorithm
         """
-
-        # Where VPs are located in 2D
-        vp2D = final_vps[:,:2] / final_vps[:,-1][:,None]
-        vp2D += self._principal_point
 
         # Extract out line coordinates
         x1 = self.__lines[:, 0]
@@ -344,21 +400,23 @@ class vp_detection(object):
         # Also normalize
         dx = x1 - x2
         dy = y1 - y2
-        dx /= np.sqrt(dx**2.0 + dy**2.0)
-        dy /= np.sqrt(dx**2.0 + dy**2.0)
+        norm_factor = np.sqrt(dx*dx + dy*dy)
+        dx /= norm_factor
+        dy /= norm_factor
 
         # Get the direction vector from each detected VP
         # to the midpoint of the line and normalize
-        xp = (vp2D[:,0][:,None] - xc[None]).T
-        yp = (vp2D[:,1][:,None] - yc[None]).T
-        xp /= np.sqrt(xp**2.0 + yp**2.0)
-        yp /= np.sqrt(xp**2.0 + yp**2.0)
+        xp = self._vps_2D[:,0][:,None] - xc[None]
+        yp = self._vps_2D[:,1][:,None] - yc[None]
+        norm_factor = np.sqrt(xp*xp + yp*yp)
+        xp /= norm_factor
+        yp /= norm_factor
 
         # Calculate the dot product then find the angle between the midpoint
         # of each line and each VPs
         # We calculate the angle that each make with respect to each line and
         # and choose the VP that has the smallest angle with the line
-        dotp = xc[:,None]*xp + yc[:,None]*yp
+        dotp = dx[None]*xp + dy[None]*yp
         dotp[dotp > 1.0] = 1.0
         dotp[dotp < -1.0] = -1.0
         ang = np.arccos(dotp)
@@ -366,17 +424,17 @@ class vp_detection(object):
 
         # For each line, which VP is the closest?
         # Get both the smallest angle and index of the smallest
-        min_ang = np.min(ang, axis=1)
-        idx_ang = np.argmin(ang, axis=1)
+        min_ang = np.min(ang, axis=0)
+        idx_ang = np.argmin(ang, axis=0)
 
         # Don't consider any lines where the smallest angle is larger than
         # a similarity threshold
-        idx_ang = idx_ang[min_ang < self._angle_thresh]
+        mask = min_ang <= self._angle_thresh
 
         # For each VP, figure out the line indices
         # Create a list of 3 elements
         # Each element contains which line index corresponds to which VP
-        self.__clusters = [np.where(idx_ang == i)[0] for i in range(3)]
+        self.__clusters = [np.where(np.logical_and(mask, idx_ang == i))[0] for i in range(3)]
 
     def find_vps(self, img):
         """
@@ -400,7 +458,8 @@ class vp_detection(object):
         # Reset principal point if we haven't set it yet
         if self._principal_point is None:
             rows, cols = img.shape[:2]
-            self._principal_point = np.array([cols/2.0, rows/2.0])
+            self._principal_point = np.array([cols/2.0, rows/2.0],
+                dtype=np.float32)
 
         # Detect lines
         lines = self.__detect_lines(img)
@@ -434,7 +493,7 @@ class vp_detection(object):
         # Group the line detections based on which VP they belong to
         # Only run if we haven't done it yet for this image
         if self.__clusters is None:
-            self.__lines_to_vps(self.__vps_hypos, self.__final_vps)
+            self.__cluster_lines(self.__vps_hypos)
 
         if save_image is not None and not isinstance(save_image, str):
             raise ValueError('The save_image path should be a string')
@@ -453,7 +512,7 @@ class vp_detection(object):
         status = np.ones(self.__lines.shape[0], dtype=np.bool)
         status[all_clusters] = False
         ind = np.where(status)[0]
-        for i, (x1, y1, x2, y2) in enumerate(self.__lines[ind]):
+        for (x1, y1, x2, y2) in self.__lines[ind]:
             cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)),
                     (0, 0, 0), 2, cv2.LINE_AA)
 

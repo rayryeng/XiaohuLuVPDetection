@@ -18,6 +18,8 @@ parser.add_argument('-ds', '--debug-show', action='store_true',
 	help='Show the debug image in an OpenCV window')
 parser.add_argument('-dp', '--debug-path', default=None,
 	help='Path for writing the debug image')
+parser.add_argument('-s', '--seed', default=None, type=int,
+	help='Specify random seed for reproducible results')
 args = parser.parse_args()
 
 # Extract command line arguments
@@ -28,13 +30,15 @@ focal_length = args.focal_length
 debug_mode = args.debug
 debug_show = args.debug_show
 debug_path = args.debug_path
+seed = args.seed
 
 print('Input path: {}'.format(input_path))
+print('Seed: {}'.format(seed))
 print('Line length threshold: {}'.format(length_thresh))
 print('Focal length: {}'.format(focal_length))
 
 # Create object
-vpd = vp_detection(length_thresh, principal_point, focal_length)
+vpd = vp_detection(length_thresh, principal_point, focal_length, seed)
 
 # Run VP detection algorithm
 vps = vpd.find_vps(input_path)
@@ -45,8 +49,8 @@ print("The vanishing points in 3D space are: ")
 for i, vp in enumerate(vps):
 	print("Vanishing Point {:d}: {}".format(i + 1, vp))
 
-vp2D = (vps[:,:2] / vps[:,-1][:,None]) + vpd.principal_point
-print("The vanishing points in image coordinates are: ")
+vp2D = vpd.vps_2D
+print("\nThe vanishing points in image coordinates are: ")
 for i, vp in enumerate(vp2D):
 	print("Vanishing Point {:d}: {}".format(i + 1, vp))
 
