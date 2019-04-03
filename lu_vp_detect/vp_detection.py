@@ -145,7 +145,10 @@ class vp_detection(object):
         self.__lengths = lengths
         self.__orientations = orientations
 
-        # Stores the VP hypotheses - 1 per longitude for each RANSAC iteration
+        # Stores the VP hypotheses - 3 per longitude for each RANSAC iteration
+        # First dimension - VP triplet proposal for a RANSAC iteration
+        # Second dimension - VPs themselves
+        # Third dimension - VP component
         vp_hypos = np.zeros((self.__ransac_iter * num_bins_vp2, 3, 3),
             dtype=np.float32)
 
@@ -189,8 +192,8 @@ class vp_detection(object):
 
             vp3 = np.cross(vp1, vp2) # Third VP is orthogonal to the two
             vp3[np.abs(vp3[:,2]) < self.__tol, 2] = self.__zero_value
-            vp3[vp3[:,2] < 0, 2] *= -1.0
             vp3 /= np.sqrt(np.sum(np.square(vp3), axis=1, keepdims=True))
+            vp3[vp3[:,2] < 0, 2] *= -1.0
 
             # Place proposals in corresponding locations
             vp_hypos[i * num_bins_vp2 : (i + 1) * num_bins_vp2, 0, :] = vp1
@@ -214,14 +217,11 @@ class vp_detection(object):
         num_bins_lat = int(lat_span / bin_size)
         num_bins_lon = int(long_span / bin_size)
 
-        # Create grid
-        #sphere_grid = np.zeros((num_bins_lat, num_bins_lon), dtype=np.float32)
-
-        # For each unique pair of lines...
+        # Get indices for every unique pair of lines
         combos = list(combinations(range(self.__lines.shape[0]), 2))
         combos = np.asarray(combos, dtype=np.int)
 
-        # Determine where the lines intersect
+        # For each pair, determine where the lines intersect
         pt_intersect = np.cross(self.__cross_p[combos[:,0]],
             self.__cross_p[combos[:,1]])
 
@@ -246,8 +246,7 @@ class vp_detection(object):
         X = (pt_intersect[:,0] / pt_intersect[:,-1]) - self._principal_point[0]
         Y = (pt_intersect[:,1] / pt_intersect[:,-1]) - self._principal_point[1]
         Z = self._focal_length
-        N = np.sqrt(X*X + Y*Y + Z*Z)
-        lat = np.arccos(Z / N)
+        lat = np.arccos(Z / np.sqrt(X*X + Y*Y + Z*Z))
         lon = np.arctan2(X, Y) + np.pi
 
         # Get corresponding bin locations
@@ -269,7 +268,7 @@ class vp_detection(object):
 
         # Add the 3 x 3 smoothed votes on top of the original votes for
         # stability (refer to paper)
-        sphere_grid += cv2.filter2D(sphere_grid, -1, np.ones((3, 3)))
+        sphere_grid += cv2.filter2D(sphere_grid, -1, (1.0/9.0)*np.ones((3, 3)))
         return sphere_grid
 
     def __get_best_vps_hypo(self, sphere_grid, vp_hypos):
@@ -277,18 +276,18 @@ class vp_detection(object):
         # Number of hypotheses
         N = vp_hypos.shape[0]
 
-        # 1 deg. in radians
-        one_deg = np.pi / 180.0
+        # Bin size - 1 deg. in radians
+        bin_size = np.pi / 180.0
 
         # Ignore any values whose augmented coordinate are less than
         # the threshold or bigger than magnitude of 1
         # Each row is a VP triplet
         # Each column is the z coordinate
-        mask = np.logical_or(np.abs(vp_hypos[:, :, 2]) >= self.__tol,
-                             np.abs(vp_hypos[:, :, 2]) < 1.0)
+        mask = np.logical_and(np.abs(vp_hypos[:, :, 2]) >= self.__tol,
+                              np.abs(vp_hypos[:, :, 2]) <= 1.0)
 
         # Create ID array for VPs
-        ids = np.arange(mask.shape[0]).astype(np.int)
+        ids = np.arange(N).astype(np.int)
         ids = np.column_stack([ids, ids, ids])
         ids = ids[mask]
 
@@ -298,20 +297,17 @@ class vp_detection(object):
             vp_hypos[:, :, 1][mask]) + np.pi
 
         # Determine which bin they map to
-        la_bin = (lat / one_deg).astype(np.int)
-        lon_bin = (lon / one_deg). astype(np.int)
+        la_bin = (lat / bin_size).astype(np.int)
+        lon_bin = (lon / bin_size). astype(np.int)
         la_bin[la_bin == 90] = 89
         lon_bin[lon_bin == 360] = 359
 
         # For each hypotheses triplet of VPs, calculate their final
-        # votes by summing the contributes of each VP for the
+        # votes by summing the contributions of each VP for the
         # hypothesis
         weights = sphere_grid[la_bin, lon_bin]
         votes = np.bincount(ids, weights=weights,
             minlength=N).astype(np.float32)
-        #votes = np.zeros(N, dtype=np.float32)
-        #for i, (la, lo) in enumerate(zip(la_bin, lon_bin)):
-        #    votes[i] += np.sum(sphere_grid[la, lo])
 
         # Find best hypothesis by determining which triplet has the largest
         # votes
@@ -330,9 +326,7 @@ class vp_detection(object):
         Primarily for display purposes only when debugging the algorithm
         """
 
-        # Create a list of 3 elements
-        # Each element contains which line index corresponds to which VP
-        self.__clusters = [None] * 3
+        # Where VPs are located in 2D
         vp2D = final_vps[:,:2] / final_vps[:,-1][:,None]
         vp2D += self._principal_point
 
@@ -380,6 +374,8 @@ class vp_detection(object):
         idx_ang = idx_ang[min_ang < self._angle_thresh]
 
         # For each VP, figure out the line indices
+        # Create a list of 3 elements
+        # Each element contains which line index corresponds to which VP
         self.__clusters = [np.where(idx_ang == i)[0] for i in range(3)]
 
     def find_vps(self, img):
