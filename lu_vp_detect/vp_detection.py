@@ -1,6 +1,8 @@
 """
 Python + OpenCV Implementation of the vanishing point algorithm by Xiaohu Lu
 et al. - http://xiaohulugo.github.io/papers/Vanishing_Point_Detection_WACV2017.pdf.
+
+Author: Ray Phan (https://github.com/rayryeng)
 """
 
 import cv2
@@ -10,16 +12,13 @@ from itertools import combinations
 class vp_detection(object):
     """
     VP Detection Object
-    Parameters -
-        length_thresh - Line segment detector threshold (default=30)
-        principal_point - Principal point of the image (in pixels)
-        focal_length - Focal length of the camera (in pixels)
-        seed - Seed for reproducibility due to RANSAC
-    Class attributes -
-        vps - The three VPs for the x, y and z directions using the
-        right-handed coordinate system
-    """
 
+    Args:
+        length_thresh:Line segment detector threshold (default=30)
+        principal_point: Principal point of the image (in pixels)
+        focal_length: Focal length of the camera (in pixels)
+        seed: Seed for reproducibility due to RANSAC
+    """
     def __init__(self, length_thresh=30, principal_point=None,
                  focal_length=1500, seed=None):
         self._length_thresh = length_thresh
@@ -48,11 +47,23 @@ class vp_detection(object):
     def length_thresh(self):
         """
         Length threshold for line segment detector
+
+        Returns:
+            The minimum length required for a line
         """
         return self._length_thresh
 
     @length_thresh.setter
     def length_thresh(self, value):
+        """
+        Length threshold for line segment detector
+
+        Args:
+            value: The minimum length required for a line
+
+        Raises:
+            ValueError: If the threshold is 0 or negative
+        """
         if value <= 0:
             raise ValueError('Invalid threshold: {}'.format(value))
 
@@ -62,12 +73,23 @@ class vp_detection(object):
     def principal_point(self):
         """
         Principal point for VP Detection algorithm
+
+        Returns:
+            The minimum length required for a line
         """
         return self._principal_point
 
     @principal_point.setter
     def principal_point(self, value):
+        """
+        Principal point for VP Detection algorithm
 
+        Args:
+            value: A list or tuple of two elements denoting the x and y coordinates
+
+        Raises:
+            ValueError: If the input is not a list or tuple and there aren't two elements
+        """
         try:
             assert isinstance(value, (list, tuple)) and not isinstance(value, str)
             assert len(value) == 2
@@ -80,11 +102,23 @@ class vp_detection(object):
     def focal_length(self):
         """
         Focal length for VP detection algorithm
+
+        Returns:
+            The focal length in pixels
         """
         return self._focal_length
 
     @focal_length.setter
     def focal_length(self, value):
+        """
+        Focal length for VP detection algorithm
+
+        Args:
+            value: The focal length in pixels
+
+        Raises:
+            ValueError: If the input is 0 or negative
+        """
         if value < self.__tol: # If the focal length is too small, reject
             raise ValueError('Invalid focal length: {}'.format(value))
 
@@ -93,20 +127,27 @@ class vp_detection(object):
     @property
     def vps(self):
         """
-        Vanishing points of the image in 3D space. Each row is a point
-        and each column is a component / coordinate
+        Vanishing points of the image in 3D space.
+
+        Returns:
+            A numpy array where each row is a point and each column is a component / coordinate
         """
         return self._vps
 
     @property
     def vps_2D(self):
         """
-        Vanishing points of the image in 2D image coordinates. Each row
-        is a point and each column is a component / coordinate
+        Vanishing points of the image in 2D image coordinates.
+
+        Returns:
+            A numpy array where each row is a point and each column is a component / coordinate
         """
         return self._vps_2D
 
     def __detect_lines(self, img):
+        """
+        Detects lines using OpenCV LSD Detector
+        """
         # Convert to grayscale if required
         if len(img.shape) == 3:
             img_copy = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -201,7 +242,7 @@ class vp_detection(object):
 
             # Find where it intersects in the sphere
             vp1 = np.zeros(3, dtype=np.float32)
-            vp1[:2] = vp1_img[:2] / vp1_img[-1] - self._principal_point
+            vp1[:2] = vp1_img[:2] / vp1_img[2] - self._principal_point
             vp1[2] = self._focal_length
 
             # Normalize
@@ -277,8 +318,8 @@ class vp_detection(object):
         combos = combos[mask]
 
         # Determine corresponding lat and lon mapped to the sphere
-        X = (pt_intersect[:,0] / pt_intersect[:,-1]) - self._principal_point[0]
-        Y = (pt_intersect[:,1] / pt_intersect[:,-1]) - self._principal_point[1]
+        X = (pt_intersect[:,0] / pt_intersect[:,2]) - self._principal_point[0]
+        Y = (pt_intersect[:,1] / pt_intersect[:,2]) - self._principal_point[1]
         Z = self._focal_length
         lat = np.arccos(Z / np.sqrt(X*X + Y*Y + Z*Z))
         lon = np.arctan2(X, Y) + np.pi
@@ -306,7 +347,6 @@ class vp_detection(object):
         return sphere_grid
 
     def __get_best_vps_hypo(self, sphere_grid, vp_hypos):
-
         # Number of hypotheses
         N = vp_hypos.shape[0]
 
@@ -347,7 +387,7 @@ class vp_detection(object):
         # votes
         best_idx = np.argmax(votes)
         final_vps = vp_hypos[best_idx]
-        vps_2D = self._focal_length * (final_vps[:,:2] / final_vps[:,-1][:,None])
+        vps_2D = self._focal_length * (final_vps[:,:2] / final_vps[:,2][:,None])
         vps_2D += self._principal_point
 
         # Find the coordinate with the largest vertical value
@@ -439,14 +479,15 @@ class vp_detection(object):
     def find_vps(self, img):
         """
         Find the vanishing points given the input image
-        Inputs -
-            img - Either the path to the image or the image read in with
-                  cv2.imread
-        Outputs -
-            A list of three two-element tuples with each tuple being the
-            VPs detected.  They are in sorted order horizontally such that
-            the first element is the far most left VP, the second element is
-            the vertical VP and the third element is the right most VP.
+
+        Args:
+            img: Either the path to the image or the image read in with `cv2.imread`
+
+        Returns:
+            A numpy array where each row is a point and each column is a component / coordinate.
+            Additionally, the VPs are ordered such that the right most VP is the
+            first row, the left most VP is the second row and the vertical VP is
+            the last row
         """
 
         # Detect the lines in the image
@@ -483,11 +524,17 @@ class vp_detection(object):
         which clusters by colouring the lines according to which VP they
         contributed to
 
-        Inputs -
-            show_image - Show the image in an OpenCV imshow window
-                         (default=false)
-            save_image - Provide a path to save the image to file
-                         (default=None - no image is saved)
+        Args:
+            show_image: Show the image in an OpenCV imshow window
+                        (default=false)
+            save_image: Provide a path to save the image to file
+                       (default=None - no image is saved)
+
+        Returns:
+            The debug image
+
+        Raises:
+            ValueError: If the path to the image is not a string or None
         """
 
         # Group the line detections based on which VP they belong to
