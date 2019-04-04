@@ -6,9 +6,6 @@ This is a Python + OpenCV implementation of the Vanishing Point algorithm by Xia
 * OpenCV 3.x
 * NumPy
 
-This is my implementation of Xiaohu Lu's Vanishing Point detection algorithm
-in Python using OpenCV 3 and NumPy.
-
 # Setup
 
 Simply run the included `setup.py` file to get it to install onto your local
@@ -81,7 +78,8 @@ print(vps)
 You can optionally create a debug image that shows which detected lines align
 with which vanishing point in the image.  They are colour coded so that each
 unique colour corresponds to the lines that provide support for a vanishing
-point.
+point.  Lines that are black correspond to "outlier" lines, meaning that they
+did not contribute any information in calculating any vanishing points.
 
 ```python
 # Create debug image
