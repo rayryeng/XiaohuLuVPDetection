@@ -409,11 +409,11 @@ class vp_detection(object):
         x2_idx = np.argmax(mask)
 
         # Re-arrange the order
-        # Right VP is first - x-axis would be to the right
-        # Left VP is second - y-axis would be to the left
+        # Left VP is first - x-axis would be to the left
+        # Right VP is second - y-axis would be to the right
         # Vertical VP is third - z-axis would be vertical
-        final_vps = final_vps[[x2_idx, x_idx, z_idx], :]
-        vps_2D = vps_2D[[x2_idx, x_idx, z_idx], :]
+        final_vps = final_vps[[x_idx, x2_idx, z_idx], :]
+        vps_2D = vps_2D[[x_idx, x2_idx, z_idx], :]
 
         # Save for later
         self._vps = final_vps
