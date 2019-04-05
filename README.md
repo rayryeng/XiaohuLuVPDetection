@@ -83,11 +83,11 @@ did not contribute any information in calculating any vanishing points.
 
 ```python
 # Create debug image
-vpd.create_debug_VP_image(debug_show=True, debug_path='./path/to/debug.png')
+vpd.create_debug_VP_image(show_image=True, save_image='./path/to/debug.png')
 ```
 
-The `debug_show` flag will open a OpenCV `imshow` window that will display the
-image.  The `debug_path` if it's not set to `None` will write the corresponding
+The `show_image` flag will open a OpenCV `imshow` window that will display the
+image.  The `save_image` if it's not set to `None` will write the corresponding
 image to file.  Of course, different combinations of the input variables will
 allow you to customize what outputs you want to consume or save.
 

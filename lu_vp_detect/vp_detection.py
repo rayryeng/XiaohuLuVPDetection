@@ -14,7 +14,7 @@ class vp_detection(object):
     VP Detection Object
 
     Args:
-        length_thresh:Line segment detector threshold (default=30)
+        length_thresh: Line segment detector threshold (default=30)
         principal_point: Principal point of the image (in pixels)
         focal_length: Focal length of the camera (in pixels)
         seed: Seed for reproducibility due to RANSAC
@@ -164,7 +164,7 @@ class vp_detection(object):
         lines = lsd.detect(img_copy)[0]
 
         # Remove singleton dimension
-        lines = lines[:,0]
+        lines = lines[:, 0]
 
         # Filter out the lines whose length is lower than the threshold
         dx = lines[:, 2] - lines[:, 0]
@@ -260,15 +260,15 @@ class vp_detection(object):
                                    np.cos(phi)])
 
             # Enforce points at infinity to be finite
-            vp2[np.abs(vp2[:,2]) < self.__tol, 2] = self.__zero_value
+            vp2[np.abs(vp2[:, 2]) < self.__tol, 2] = self.__zero_value
             # Normalize
             vp2 /= np.sqrt(np.sum(np.square(vp2), axis=1, keepdims=True))
-            vp2[vp2[:,2] < 0, 2] *= -1.0 # Ensure direction is +z
+            vp2[vp2[:, 2] < 0, :] *= -1.0 # Ensure direction is +z
 
             vp3 = np.cross(vp1, vp2) # Third VP is orthogonal to the two
             vp3[np.abs(vp3[:,2]) < self.__tol, 2] = self.__zero_value
             vp3 /= np.sqrt(np.sum(np.square(vp3), axis=1, keepdims=True))
-            vp3[vp3[:,2] < 0, 2] *= -1.0
+            vp3[vp3[:, 2] < 0, :] *= -1.0
 
             # Place proposals in corresponding locations
             vp_hypos[i * num_bins_vp2 : (i + 1) * num_bins_vp2, 0, :] = vp1
@@ -297,17 +297,17 @@ class vp_detection(object):
         combos = np.asarray(combos, dtype=np.int)
 
         # For each pair, determine where the lines intersect
-        pt_intersect = np.cross(self.__cross_p[combos[:,0]],
-            self.__cross_p[combos[:,1]])
+        pt_intersect = np.cross(self.__cross_p[combos[:, 0]],
+            self.__cross_p[combos[:, 1]])
 
         # Ignore if points are at infinity
-        mask = np.abs(pt_intersect[:,2]) >= self.__tol
+        mask = np.abs(pt_intersect[:, 2]) >= self.__tol
 
         # To determine if two points map to the same VP in spherical
         # coordinates, their difference in angle must be less than
         # some threshold
-        ang = np.abs(self.__orientations[combos[:,0]] -
-            self.__orientations[combos[:,1]])
+        ang = np.abs(self.__orientations[combos[:, 0]] -
+            self.__orientations[combos[:, 1]])
         ang = np.minimum(np.pi - ang, ang)
         mask = np.logical_and(mask,  np.abs(ang) <= self.__angle_tol)
 
@@ -318,8 +318,8 @@ class vp_detection(object):
         combos = combos[mask]
 
         # Determine corresponding lat and lon mapped to the sphere
-        X = (pt_intersect[:,0] / pt_intersect[:,2]) - self._principal_point[0]
-        Y = (pt_intersect[:,1] / pt_intersect[:,2]) - self._principal_point[1]
+        X = (pt_intersect[:, 0] / pt_intersect[:, 2]) - self._principal_point[0]
+        Y = (pt_intersect[:, 1] / pt_intersect[:, 2]) - self._principal_point[1]
         Z = self._focal_length
         lat = np.arccos(Z / np.sqrt(X*X + Y*Y + Z*Z))
         lon = np.arctan2(X, Y) + np.pi
@@ -334,8 +334,8 @@ class vp_detection(object):
         # Get 1D bin coordinate so we can take advantage
         # of bincount method, then reshape back to 2D
         bin_num = la_bin * num_bins_lon + lon_bin
-        weights = np.sqrt(self.__lengths[combos[:,0]] *
-            self.__lengths[combos[:,1]]) * (np.sin(2.0 * ang) + 0.2)
+        weights = np.sqrt(self.__lengths[combos[:, 0]] *
+            self.__lengths[combos[:, 1]]) * (np.sin(2.0 * ang) + 0.2)
 
         sphere_grid = np.bincount(bin_num, weights=weights,
             minlength=num_bins_lat * num_bins_lon).reshape(
@@ -387,12 +387,12 @@ class vp_detection(object):
         # votes
         best_idx = np.argmax(votes)
         final_vps = vp_hypos[best_idx]
-        vps_2D = self._focal_length * (final_vps[:,:2] / final_vps[:,2][:,None])
+        vps_2D = self._focal_length * (final_vps[:, :2] / final_vps[:, 2][:, None])
         vps_2D += self._principal_point
 
         # Find the coordinate with the largest vertical value
         # This will be the last column of the output
-        z_idx = np.argmax(np.abs(vps_2D[:,1]))
+        z_idx = np.argmax(np.abs(vps_2D[:, 1]))
         ind = np.arange(3).astype(np.int)
         mask = np.ones(3, dtype=np.bool)
         mask[z_idx] = False
@@ -446,8 +446,8 @@ class vp_detection(object):
 
         # Get the direction vector from each detected VP
         # to the midpoint of the line and normalize
-        xp = self._vps_2D[:,0][:,None] - xc[None]
-        yp = self._vps_2D[:,1][:,None] - yc[None]
+        xp = self._vps_2D[:, 0][:, None] - xc[None]
+        yp = self._vps_2D[:, 1][:, None] - yc[None]
         norm_factor = np.sqrt(xp*xp + yp*yp)
         xp /= norm_factor
         yp /= norm_factor
@@ -552,7 +552,7 @@ class vp_detection(object):
         colours = 255*np.eye(3)
         # BGR format
         # First row is red, second green, third blue
-        colours = colours[:,::-1].astype(np.int).tolist()
+        colours = colours[:, ::-1].astype(np.int).tolist()
 
         # Draw the outlier lines as black
         all_clusters = np.hstack(self.__clusters)
