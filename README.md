@@ -45,8 +45,8 @@ Simply create a `vp_detection` object with the desired parameters and run the
 detection algorithm with the desired image.  You can read in the image yourself
 or you can provide a path to the image.  Note that the returned vanishing
 points will be a 3 x 3 NumPy array such that the first row corresponds to the
-vanishing point appearing to the left of the image, the second row
-corresponds to the vanishing point appearing to the right of the image and the
+vanishing point appearing to the right of the image, the second row
+corresponds to the vanishing point appearing to the left of the image and the
 last row corresponding to the vertical vanishing point:
 
 ```python
@@ -177,17 +177,17 @@ Line length threshold: 60.0
 Focal length: 1102.79
 Principal point: [484. 324.]
 The vanishing points in 3D space are:
-Vanishing Point 1: [-0.9260219   0.00812403  0.37738246]
-Vanishing Point 2: [0.3774699  0.01993015 0.92580736]
+Vanishing Point 1: [0.3774699  0.01993015 0.92580736]
+Vanishing Point 2: [-0.9260219   0.00812403  0.37738246]
 Vanishing Point 3: [-0.         -0.9997684   0.02152233]
 
 The vanishing points in image coordinates are:
-Vanishing Point 1: [-2222.0286   347.7401]
-Vanishing Point 2: [933.6292 347.7401]
+Vanishing Point 1: [933.6292 347.7401]
+Vanishing Point 2: [-2222.0286   347.7401]
 Vanishing Point 3: [   484.    -50903.473]
 Creating debug image and showing to the screen
 ```
-![](https://i.imgur.com/1zoZIiI.png)
+![](https://i.imgur.com/svI8tSC.png)
 
 # License
 
