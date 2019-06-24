@@ -23,7 +23,7 @@ script to test out the algorithm.
 # How to use
 
 The main detection algorithm is written in the `lu_vp_detect` package and is
-implemented in the file `vp_detection.py`.  The `vp_detection` class is what
+implemented in the file `vp_detection.py`.  The `VPDetection` class is what
 is required and there are two methods of interest in the class:
 
 * `find_vps`: Finds the vanishing points in normalized 3D space
@@ -41,7 +41,7 @@ is 1500.
 * `seed`: An optional integer ID that specifies the seed for reproducibility
 as part of the algorithm uses RANSAC.  Default is `None` so no seed is used.
 
-Simply create a `vp_detection` object with the desired parameters and run the
+Simply create a `VPDetection` object with the desired parameters and run the
 detection algorithm with the desired image.  You can read in the image yourself
 or you can provide a path to the image.  Note that the returned vanishing
 points will be a 3 x 3 NumPy array such that the first row corresponds to the
@@ -50,7 +50,7 @@ corresponds to the vanishing point appearing to the left of the image and the
 last row corresponding to the vertical vanishing point:
 
 ```python
-from lu_vp_detect.vp_detection import vp_detection
+from lu_vp_detect.vp_detection import VPDetection
 length_thresh = ... # Minimum length of the line in pixels
 principal_point = (...,...) # Specify a list or tuple of two coordinates
                             # First value is the x or column coordinate
@@ -58,7 +58,7 @@ principal_point = (...,...) # Specify a list or tuple of two coordinates
 focal_length = ... # Specify focal length in pixels
 seed = None # Or specify whatever ID you want (integer)
 
-vpd = vp_detection(length_thresh, principal_point, focal_length, seed)
+vpd = VPDetection(length_thresh, principal_point, focal_length, seed)
 
 img = '...' # Provide a path to the image
 # or you can read in the image yourself
@@ -155,7 +155,7 @@ point is assumed to be the centre of the image.
 For completeness, to do this programmatically:
 
 ```python
-from lu_vp_detect.vp_detection import vp_detection
+from lu_vp_detect.vp_detection import VPDetection
 length_thresh = 60
 principal_point = None
 focal_length = 1102.79
@@ -163,7 +163,7 @@ seed = 1337
 
 img = './test_image.jpg'
 
-vpd = vp_detection(length_thresh, principal_point, focal_length, seed)
+vpd = VPDetection(length_thresh, principal_point, focal_length, seed)
 vps = vpd.find_vps(img)
 print(vps)
 ```

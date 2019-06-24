@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 setup.py file for installing the VP detection package.
 
@@ -15,7 +14,7 @@ from setuptools import find_packages, setup
 
 # Package meta-data.
 NAME = 'lu_vp_detect'
-DESCRIPTION = 'Xiaohu Lu''s Vanishing Point Detection algorithm'
+DESCRIPTION = "Xiaohu Lu's Vanishing Point Detection algorithm"
 URL = 'https://github.com/rayryeng/XiaohuLuVPDetection'
 EMAIL = 'ray@hover.to'
 AUTHOR = 'Ray Phan'
@@ -23,9 +22,7 @@ REQUIRES_PYTHON = '>=3.5.0'
 VERSION = None
 
 # Required packages
-REQUIRED = [
-    'numpy', 'opencv-contrib-python'
-]
+REQUIRED = ['numpy', 'opencv-contrib-python']
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -45,7 +42,6 @@ if not VERSION:
 else:
     about['__version__'] = VERSION
 
-
 # Where the magic happens:
 setup(
     name=NAME,
@@ -57,10 +53,10 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
+    packages=find_packages(
+        exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
     #py_modules=['lu_vp_detect'],
-
     entry_points={
         'console_scripts': ['run_vp_detect=lu_vp_detect.run_vp_detect:main'],
     },
