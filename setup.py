@@ -22,7 +22,7 @@ REQUIRES_PYTHON = '>=3.5.0'
 VERSION = None
 
 # Required packages
-REQUIRED = ['numpy', 'opencv-contrib-python']
+REQUIRED = ['numpy', 'opencv-contrib-python==4.0.0.21']
 
 here = os.path.abspath(os.path.dirname(__file__))
 
