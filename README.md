@@ -3,7 +3,7 @@ This is a Python + OpenCV implementation of the Vanishing Point algorithm by Xia
 
 # Requirements
 * Python 3
-* OpenCV 3.x
+* OpenCV Contrib 3.x or 4.0.0.21 - Please note that any version higher than 4.0.0.21 does not have the LSD detection algorithm included, which is a key component for this method to work.  If you have a higher version of OpenCV installed, this will not work.
 * NumPy
 
 # Setup
