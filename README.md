@@ -63,7 +63,7 @@ corresponds to the vanishing point appearing to the left of the image and the
 last row corresponding to the vertical vanishing point:
 
 ```python
-from lu_vp_detect.vp_detection import VPDetection
+from lu_vp_detect import VPDetection
 length_thresh = ... # Minimum length of the line in pixels
 principal_point = (...,...) # Specify a list or tuple of two coordinates
                             # First value is the x or column coordinate
@@ -168,7 +168,7 @@ point is assumed to be the centre of the image.
 For completeness, to do this programmatically:
 
 ```python
-from lu_vp_detect.vp_detection import VPDetection
+from lu_vp_detect import VPDetection
 length_thresh = 60
 principal_point = None
 focal_length = 1102.79

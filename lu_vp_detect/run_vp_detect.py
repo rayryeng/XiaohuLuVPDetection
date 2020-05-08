@@ -1,5 +1,5 @@
 import argparse
-from lu_vp_detect.vp_detection import VPDetection
+from lu_vp_detect import VPDetection
 
 # Set up argument parser + options
 parser = argparse.ArgumentParser(
