@@ -8,13 +8,26 @@ This is a Python + OpenCV implementation of the Vanishing Point algorithm by Xia
 
 # Setup
 
-Simply run the included `setup.py` file to get it to install onto your local
-machine:
+## Method #1 - Cloning this repo and installing locally
+
+Simply clone this repo, then run the included `setup.py` file to get it to install onto your local machine:
 
 ```
 $ python setup.py build
 $ python setup.py install
 ```
+
+## Method #2 - Through PyPI
+
+This project is now available through PyPI: https://pypi.org/project/lu-vp-detect/
+
+If don't want to clone this repo, you can simply use `pip install` to install this project on your system.
+
+```
+$ pip install lu-vp-detect
+```
+
+## After installation
 
 The `lu_vp_detect` package should be installed at this point which will
 contain the implementation of the algorithm as well as a command-line test
