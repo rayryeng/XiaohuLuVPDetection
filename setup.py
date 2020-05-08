@@ -16,7 +16,7 @@ from setuptools import find_packages, setup
 NAME = 'lu_vp_detect'
 DESCRIPTION = "Xiaohu Lu's Vanishing Point Detection algorithm"
 URL = 'https://github.com/rayryeng/XiaohuLuVPDetection'
-EMAIL = 'ray@hover.to'
+EMAIL = 'rphan@ryerson.ca'
 AUTHOR = 'Ray Phan'
 REQUIRES_PYTHON = '>=3.5.0'
 VERSION = None
