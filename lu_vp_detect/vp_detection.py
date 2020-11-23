@@ -8,7 +8,7 @@ Author: Ray Phan (https://github.com/rayryeng)
 import cv2
 import numpy as np
 from itertools import combinations
-
+from pylsd import lsd
 
 class VPDetection(object):
     """
@@ -161,16 +161,18 @@ class VPDetection(object):
             img_copy = img
 
         # Create LSD detector with default parameters
-        lsd = cv2.createLineSegmentDetector(0)
+        #lsd = cv2.createLineSegmentDetector(0)
 
         # Detect lines in the image
         # Returns a NumPy array of type N x 1 x 4 of float32
         # such that the 4 numbers in the last dimension are (x1, y1, x2, y2)
         # These denote the start and end positions of a line
-        lines = lsd.detect(img_copy)[0]
-
+        # lines = lsd.detect(img_copy)[0]
+        lines = lsd(img_copy)
+        lines = lines[:, : 4]
+        print(lines.shape)
         # Remove singleton dimension
-        lines = lines[:, 0]
+        #lines = lines[:, 0]
 
         # Filter out the lines whose length is lower than the threshold
         dx = lines[:, 2] - lines[:, 0]
@@ -204,6 +206,8 @@ class VPDetection(object):
                                                            dtype=np.float32)))
         p2 = np.column_stack((self.__lines[:, 2:], np.ones(N,
                                                            dtype=np.float32)))
+        print(p1.shape)
+        print(p2.shape)
         cross_p = np.cross(p1, p2)
         dx = p1[:, 0] - p2[:, 0]
         dy = p1[:, 1] - p2[:, 1]
@@ -535,7 +539,7 @@ class VPDetection(object):
         self.__clusters = None  # Reset because of new image
         return best_vps
 
-    def create_debug_VP_image(self, show_image=False, save_image=None):
+    def create_debug_VP_image(self, show_image=False, save_image=None, show_vp = False):
         """
         Once the VP detection algorithm runs, show which lines belong to
         which clusters by colouring the lines according to which VP they
@@ -546,6 +550,8 @@ class VPDetection(object):
                         (default=false)
             save_image: Provide a path to save the image to file
                        (default=None - no image is saved)
+            show_vp:    Show the vanishing point on the image
+                        (default = false, added by Harry Beggs)
 
         Returns:
             The debug image
@@ -587,8 +593,15 @@ class VPDetection(object):
                          colours[i], 2, cv2.LINE_AA)
 
         # Show image if necessary
+        if (show_vp):  # show vps
+            vps = self.vps_2D
+            for i in range(len(vps)):
+                tup = tuple(vps[i])
+                cv2.circle(img, tup, 1, [0, 0, 255], 10)
+
         if show_image:
             cv2.imshow('VP Debug Image', img)
+
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
