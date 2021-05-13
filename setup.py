@@ -8,7 +8,6 @@ https://github.com/navdeep-G/setup.py
 
 import io
 import os
-import sys
 
 from setuptools import find_packages, setup
 
@@ -56,7 +55,7 @@ setup(
     packages=find_packages(
         exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
-    #py_modules=['lu_vp_detect'],
+    # py_modules=['lu_vp_detect'],
     entry_points={
         'console_scripts': ['run_vp_detect=lu_vp_detect.run_vp_detect:main'],
     },
