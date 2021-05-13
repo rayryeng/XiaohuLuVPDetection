@@ -2,8 +2,8 @@
 """
 setup.py file for installing the VP detection package.
 
-Heavily borrowed from Kenneth Reitz -
-https://github.com/kennethreitz/setup.py
+Heavily borrowed from Navdeep Gill -
+https://github.com/navdeep-G/setup.py
 """
 
 import io
