@@ -4,10 +4,27 @@ et al. - http://xiaohulugo.github.io/papers/Vanishing_Point_Detection_WACV2017.p
 
 Author: Ray Phan (https://github.com/rayryeng)
 """
-
+from pudb import set_trace; set_trace(paused=False)
+from platform import node
 import cv2
+
+import matplotlib.pyplot as plt
+import math
+import lsd
 import numpy as np
+from enum import Enum, auto
 from itertools import combinations
+
+from pygo.utils.line import line_angle_diff, min_line_endpoint_dist, merge_lines, merge_lines_mean
+from pygo.utils.image import toColorImage
+
+from scipy.spatial import cKDTree
+from scipy.spatial.distance import cdist
+from sklearn.cluster import KMeans
+
+class LS_ALG(Enum):
+    LSD = auto()
+    HOUGH = auto()
 
 
 class VPDetection(object):
@@ -22,10 +39,11 @@ class VPDetection(object):
     """
 
     def __init__(self,
-                 length_thresh=30,
+                 length_thresh=200,
                  principal_point=None,
                  focal_length=1500,
-                 seed=None):
+                 seed=None,
+                 line_search_alg=LS_ALG.LSD):
         self._length_thresh = length_thresh
         self._principal_point = principal_point
         self._focal_length = focal_length
@@ -47,6 +65,8 @@ class VPDetection(object):
         # Total number of iterations for RANSAC
         conf = 0.9999
         self.__ransac_iter = int(np.log(1 - conf) / np.log(1.0 - p))
+
+        self.ls_alg = line_search_alg
 
     @property
     def length_thresh(self):
@@ -150,6 +170,82 @@ class VPDetection(object):
         """
         return self._vps_2D
 
+    def get_lines(self):
+        self.__cluster_lines(self.__vps_hypos)
+        lines = [[],[],[]]
+        for i in range(3):
+            for (x1, y1, x2, y2) in self.__lines[self.__clusters[i]]:
+                lines[i].append(np.array([x1,y1,x2,y2]))
+        return lines
+
+    def __redcue_parallel(self, lines):
+        # merge lines by their median position -> lsd produces two lines for each segment
+        mx = np.median([lines[:,0], lines[:,2]], axis=0)[:,None]
+        my = np.median([lines[:,1], lines[:,3]], axis=0)[:,None]
+        data = np.hstack((mx,my))
+        tree = cKDTree(data)
+        pairs = tree.query_pairs(5)
+        reducedLines = []
+        IDX = []
+        for (idx0, idx1) in pairs:
+            IDX.append(idx0)
+            IDX.append(idx1)
+            m = merge_lines_mean(lines[idx0], lines[idx1])
+            reducedLines.append(m)
+            m = np.array(m, dtype=int)
+
+        for i in range(len(lines)):
+            if i not in IDX:
+                reducedLines.append(lines[i])
+
+        lines = np.array(reducedLines)
+        return lines
+
+
+    def __reduce_simple(self, lines):
+ 
+        merged = []
+        for _ in range(4):
+            # save calc by mirroring?
+            da = cdist(lines[:,:2], lines[:,:2])
+            db = cdist(lines[:,:2], lines[:,2:])
+            dc = cdist(lines[:,2:], lines[:,2:])
+            dd = cdist(lines[:,2:], lines[:,:2])
+            dist = np.min(np.dstack((da,db,dc,dd)), axis=2)   # min distance between point pairs
+            dist = np.min(np.dstack((np.tril(dist).T, np.triu(dist))), axis=2)
+
+            dist_thresh = 15
+            angle_thresh = (5*np.pi/180)
+            m1 = np.ma.masked_less(dist, dist_thresh)
+            m2 = np.ma.masked_greater(dist,0)
+
+            mask = np.logical_and(m1.mask, m2.mask)
+
+            merged = []
+
+            allready_merged = []
+            for idx0 in range(len(mask)):
+                idx_nbr = np.argwhere(mask[idx0])
+                matched = False
+                line0 = lines[idx0]
+                if idx0 in allready_merged:
+                    continue
+                if len(idx_nbr) > 0:
+                    for idx1 in idx_nbr[:,0]:
+                        if idx1 in allready_merged:
+                            continue
+                        angle = line_angle_diff(line0, lines[idx1])
+                        if angle < angle_thresh:
+                            line0 = merge_lines(line0, lines[idx1])
+                            allready_merged.append(idx1)
+                            break
+ 
+                merged.append(line0)
+            lines = np.array(merged)
+
+        return lines
+
+
     def __detect_lines(self, img):
         """
         Detects lines using OpenCV LSD Detector
@@ -161,29 +257,210 @@ class VPDetection(object):
             img_copy = img
 
         # Create LSD detector with default parameters
-        lsd = cv2.createLineSegmentDetector(0)
+        #lsd = cv2.createLineSegmentDetector(0)
+        h,w = img_copy.shape
+        if self.ls_alg == LS_ALG.LSD:
+            lines = lsd.lsd(img_copy.reshape(-1),w,h)
+            lines = np.array([x[:4] for x in lines],dtype=int)
+            print('Before {}'.format(len(lines)))
+        elif self.ls_alg == LS_ALG.HOUGH:
+            cv2.imwrite('out2.png', img_copy)
+            img_copy = cv2.GaussianBlur(img_copy, (3,3), 0)
+            thresh, img_copy = cv2.threshold(img_copy, \
+                                    0, \
+                                    255, \
+                                    cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+            lns = cv2.HoughLines(img_copy, 
+                                rho=1, 
+                                theta= (np.pi/180*1), 
+                                threshold=150)
+            cv2.imshow('orig', img_copy.copy())
+            lines = []
+            if lns is not None:
+                for i in range(0, len(lns)):
+                    rho = lns[i][0][0]
+                    theta = lns[i][0][1]
+                    a = math.cos(theta)
+                    b = math.sin(theta)
+                    x0 = a * rho
+                    y0 = b * rho
+                    pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
+                    pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
+                    cv2.line(img_copy, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
+                    lines.append([pt1[0],pt1[1],pt2[0],pt2[1]])
+            lines = np.array(lines, dtype=float)
 
-        # Detect lines in the image
-        # Returns a NumPy array of type N x 1 x 4 of float32
-        # such that the 4 numbers in the last dimension are (x1, y1, x2, y2)
-        # These denote the start and end positions of a line
-        lines = lsd.detect(img_copy)[0]
-
-        # Remove singleton dimension
-        lines = lines[:, 0]
 
         # Filter out the lines whose length is lower than the threshold
         dx = lines[:, 2] - lines[:, 0]
         dy = lines[:, 3] - lines[:, 1]
         lengths = np.sqrt(dx * dx + dy * dy)
+        mask = lengths >= 10
+        lines = lines[mask]
+        dx = lines[:, 2] - lines[:, 0]
+        dy = lines[:, 3] - lines[:, 1]
+        lengths = np.sqrt(dx * dx + dy * dy)
+ 
+
+        angles = np.arctan2(dy,dx)
+        angles[angles<0] += (np.pi)
+        sorting = np.argsort(angles)
+        lines = lines[sorting]
+        
+        lines = self.__redcue_parallel(lines)
+        lines = self.__reduce_graph(lines, img) 
+        #lines = self.__reduce_simple(lines)
+
+        dx = lines[:, 2] - lines[:, 0]
+        dy = lines[:, 3] - lines[:, 1]
+        lengths = np.sqrt(dx * dx + dy * dy)
+ 
         mask = lengths >= self._length_thresh
         lines = lines[mask]
 
+        #img_lines = toColorImage(img)
+        #for pt in lines:
+        #    pt = np.array(pt, dtype=int)
+        #    cv2.line(img_lines, pt[:2], pt[2:], (np.random.randint(255),np.random.randint(255), np.random.randint(255)), 1)
+        #cv2.imshow('lines', img_lines)
+        #cv2.waitKey(1)
         # Store the lines internally
+
+        print('After {}'.format(len(lines)))
         self.__lines = lines
 
         # Return the lines
         return lines
+
+    def __reduce_graph(self, lines, img):
+        #for line in lines:
+        #    pt = np.squeeze(np.array(line, dtype=int))
+        #    color = (255,255,255)
+        #    cv2.line(img, pt[:2], pt[2:], color, 2)
+        #cv2.imshow('lines', img)
+        #cv2.waitKey(0)
+
+        # save calc by mirroring?
+
+        merged_lines = []
+        id = 0
+        def __calc_dist(lines):
+            da = cdist(lines[:,:2], lines[:,:2])
+            db = cdist(lines[:,:2], lines[:,2:])
+            dc = cdist(lines[:,2:], lines[:,:2])
+            dd = cdist(lines[:,2:], lines[:,2:])
+            dist = np.min(np.dstack((da,db, dc,dd)), axis=2)   # min distance between point pairs
+            #dist = np.min(np.dstack((np.tril(dist).T, np.triu(dist))), axis=2)
+            eye = np.eye(dist.shape[0]) * dist.max()
+            dist += eye
+            return dist
+
+        # precalculate angles
+        diff1 = lines[:,:2] - lines[:,2:]
+        diff2 = lines[:,2:] - lines[:,:2]
+        a1 = np.arctan2(diff1[:,1], diff1[:,0])
+        a2 = np.arctan2(diff2[:,1], diff2[:,0])
+        angles = a1
+        angles[a1 > np.pi/2] = a2[a1 > np.pi/2]
+        angles[a1 < -np.pi/2] = a2[a1 < -np.pi/2]
+        angles_all = np.squeeze(angles)
+        clusters = KMeans(n_clusters=2, n_init=1).fit(np.abs(angles_all).reshape(-1,1)).labels_
+        #angles = np.squeeze(np.max(np.dstack((a1,a2)), axis=2))
+        dist_thresh = 15
+
+        for clst in range(2):
+            reduced_cluster = []
+            lines_ = lines[clusters==clst]
+            dist = __calc_dist(lines_)
+            angles = angles_all[clusters==clst]
+                    
+
+            def next(node_idx):
+                while(True):
+                    idx = np.argmin(dist[node_idx])
+                    distance = dist[node_idx,idx]
+
+                    if distance > dist_thresh:
+                        visited.append(idx)
+                        return None
+
+                    angle_diff = np.abs(np.abs(angles[node_idx]) - np.abs(angles[idx]))
+                    if angle_diff < (5*np.pi/180) and idx not in visited:
+                        return idx
+                    else:
+                        visited.append(idx)
+                        dist[node_idx,idx] = dist.max()
+
+            S = []				#Stack S initialisieren
+            pred_idx = [None] * len(dist)
+            num_nodes = len(dist) 
+            end_idx = []
+            groups = np.ones(len(dist)) *-1
+            matched = []
+            visited = []
+            edge_lines = []
+            for node_idx in range(num_nodes):
+                if groups[node_idx] == -1:
+                    stack_grows = True
+    
+                    visited.append(node_idx)
+                    S.append(node_idx)
+                    while len(S) > 0:
+                        groups[node_idx] = id
+                        next_idx = next(node_idx)
+                        if next_idx is not None:
+                            matched.append(node_idx)
+                            visited.append(next_idx)
+                            pred_idx[next_idx] = node_idx
+                            if next(next_idx) is not None:
+                                S.append(next_idx)
+                            node_idx = next_idx
+                        else:
+                        
+                            if stack_grows and node_idx not in matched:
+                                edge_lines.append(node_idx)
+                                stack_grows=False
+                            end_idx.append(node_idx)
+
+                            if len(S)>0:
+                                node_idx = S.pop()
+                            if len(S) == 1:
+                                stack_grows = True
+                            if node_idx not in end_idx:
+                               S.append(node_idx)
+                if len(edge_lines) == 0:
+                    # no go line selected
+                    continue
+
+                if len(edge_lines) == 1:
+                    # we started at the end
+                    edge_lines.append(node_idx)
+
+                reduced_cluster.append(merge_lines(lines_[edge_lines[0]], 
+                                                lines_[edge_lines[-1]]))
+
+                #imgc = toColorImage(img)
+                edge_lines = []
+
+                #visited = list(set(matched))
+                visited = matched
+                id += 1
+            merge_lines.append(reduced_cluster)
+        #imgc = toColorImage(img) 
+        #for line in merged_lines:
+        #    color = (np.random.randint(255),
+        #             np.random.randint(255),
+        #             np.random.randint(255))
+
+        #    pt = np.squeeze(np.array(line, dtype=int))
+        #    cv2.line(imgc, pt[:2], pt[2:], color, 2)
+ 
+        #cv2.imshow('lines', imgc)
+        #cv2.waitKey(0)
+        #lines = np.array(merged_lines)
+        lines_v = np.array(merged_lines[0])
+        lines_h = np.array(merged_lines[1])
+        return lines_v, lines_h
 
     def __find_vp_hypotheses_two_lines(self):
         """
@@ -302,7 +579,7 @@ class VPDetection(object):
 
         # Get indices for every unique pair of lines
         combos = list(combinations(range(self.__lines.shape[0]), 2))
-        combos = np.asarray(combos, dtype=np.int)
+        combos = np.asarray(combos, dtype=int)
 
         # For each pair, determine where the lines intersect
         pt_intersect = np.cross(self.__cross_p[combos[:, 0]],
@@ -335,8 +612,8 @@ class VPDetection(object):
         lon = np.arctan2(X, Y) + np.pi
 
         # Get corresponding bin locations
-        la_bin = (lat / bin_size).astype(np.int)
-        lon_bin = (lon / bin_size).astype(np.int)
+        la_bin = (lat / bin_size).astype(int)
+        lon_bin = (lon / bin_size).astype(int)
         la_bin[la_bin >= num_bins_lat] = num_bins_lat - 1
         lon_bin[lon_bin >= num_bins_lon] = num_bins_lon - 1
 
@@ -375,7 +652,7 @@ class VPDetection(object):
             np.abs(vp_hypos[:, :, 2]) <= 1.0)
 
         # Create ID array for VPs
-        ids = np.arange(N).astype(np.int)
+        ids = np.arange(N).astype(int)
         ids = np.column_stack([ids, ids, ids])
         ids = ids[mask]
 
@@ -385,8 +662,8 @@ class VPDetection(object):
                          vp_hypos[:, :, 1][mask]) + np.pi
 
         # Determine which bin they map to
-        la_bin = (lat / bin_size).astype(np.int)
-        lon_bin = (lon / bin_size).astype(np.int)
+        la_bin = (lat / bin_size).astype(int)
+        lon_bin = (lon / bin_size).astype(int)
         la_bin[la_bin == 90] = 89
         lon_bin[lon_bin == 360] = 359
 
@@ -408,8 +685,8 @@ class VPDetection(object):
         # Find the coordinate with the largest vertical value
         # This will be the last column of the output
         z_idx = np.argmax(np.abs(vps_2D[:, 1]))
-        ind = np.arange(3).astype(np.int)
-        mask = np.ones(3, dtype=np.bool)
+        ind = np.arange(3).astype(int)
+        mask = np.ones(3, dtype=bool)
         mask[z_idx] = False
         ind = ind[mask]
 
@@ -485,6 +762,7 @@ class VPDetection(object):
         # Don't consider any lines where the smallest angle is larger than
         # a similarity threshold
         mask = min_ang <= self._angle_thresh
+        
 
         # For each VP, figure out the line indices
         # Create a list of 3 elements
@@ -510,7 +788,6 @@ class VPDetection(object):
         # Detect the lines in the image
         if isinstance(img, str):
             img = cv2.imread(img, -1)
-
         self.__img = img  # Keep a copy for later
 
         # Reset principal point if we haven't set it yet
@@ -569,11 +846,11 @@ class VPDetection(object):
         colours = 255 * np.eye(3)
         # BGR format
         # First row is red, second green, third blue
-        colours = colours[:, ::-1].astype(np.int).tolist()
+        colours = colours[:, ::-1].astype(int).tolist()
 
         # Draw the outlier lines as black
         all_clusters = np.hstack(self.__clusters)
-        status = np.ones(self.__lines.shape[0], dtype=np.bool)
+        status = np.ones(self.__lines.shape[0], dtype=bool)
         status[all_clusters] = False
         ind = np.where(status)[0]
         for (x1, y1, x2, y2) in self.__lines[ind]:

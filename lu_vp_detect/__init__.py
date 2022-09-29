@@ -1,1 +1,1 @@
-from .vp_detection import VPDetection
+from .vp_detection import VPDetection, LS_ALG
