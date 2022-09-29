@@ -56,6 +56,8 @@ class VPDetection(object):
         self.__tol = 1e-8  # Tolerance for floating point comparison
         self.__angle_tol = np.pi / 3  # (pi / 180 * (60 degrees)) = +/- 30 deg
         self.__lines = None  # Stores the line detections internally
+        self.__lines_v = None
+        self.__lines_h = None
         self.__zero_value = 0.001  # Threshold to check augmented coordinate
         # Anything less than __tol gets set to this
         self.__seed = seed  # Set seed for reproducibility
@@ -300,29 +302,31 @@ class VPDetection(object):
         dx = lines[:, 2] - lines[:, 0]
         dy = lines[:, 3] - lines[:, 1]
         lengths = np.sqrt(dx * dx + dy * dy)
-        mask = lengths >= 10
-        lines = lines[mask]
-        dx = lines[:, 2] - lines[:, 0]
-        dy = lines[:, 3] - lines[:, 1]
-        lengths = np.sqrt(dx * dx + dy * dy)
- 
-
-        angles = np.arctan2(dy,dx)
-        angles[angles<0] += (np.pi)
-        sorting = np.argsort(angles)
-        lines = lines[sorting]
-        
-        lines = self.__redcue_parallel(lines)
-        lines = self.__reduce_graph(lines, img) 
-        #lines = self.__reduce_simple(lines)
-
-        dx = lines[:, 2] - lines[:, 0]
-        dy = lines[:, 3] - lines[:, 1]
-        lengths = np.sqrt(dx * dx + dy * dy)
- 
         mask = lengths >= self._length_thresh
         lines = lines[mask]
 
+
+        #angles = np.arctan2(dy,dx)
+        #angles[angles<0] += (np.pi)
+        #sorting = np.argsort(angles)
+        #lines = lines[sorting]
+        #imgc =toColorImage(img)
+        #for line in lines:
+        #    pt = np.squeeze(np.array(line, dtype=int))
+        #    color = (255,0,255)
+        #    cv2.line(imgc, pt[:2], pt[2:], color, 2)
+        #cv2.imshow('lines', imgc)
+        #cv2.waitKey(0)
+
+
+        lines = self.__redcue_parallel(lines)
+        lines_v, lines_h = self.__reduce_graph(lines, img) 
+        lines = np.concatenate((lines_v, lines_h), axis=0)
+        self.__lines_h = lines_h
+        self.__lines_v = lines_v
+        #lines = self.__reduce_simple(lines)
+
+ 
         #img_lines = toColorImage(img)
         #for pt in lines:
         #    pt = np.array(pt, dtype=int)
@@ -338,12 +342,7 @@ class VPDetection(object):
         return lines
 
     def __reduce_graph(self, lines, img):
-        #for line in lines:
-        #    pt = np.squeeze(np.array(line, dtype=int))
-        #    color = (255,255,255)
-        #    cv2.line(img, pt[:2], pt[2:], color, 2)
-        #cv2.imshow('lines', img)
-        #cv2.waitKey(0)
+
 
         # save calc by mirroring?
 
@@ -371,7 +370,17 @@ class VPDetection(object):
         angles_all = np.squeeze(angles)
         clusters = KMeans(n_clusters=2, n_init=1).fit(np.abs(angles_all).reshape(-1,1)).labels_
         #angles = np.squeeze(np.max(np.dstack((a1,a2)), axis=2))
-        dist_thresh = 15
+        dist_thresh = 10
+
+        #for clst in range(2):
+        #    imgc =toColorImage(img)
+        #    lines_ = lines[clusters==clst]
+        #    for line in lines_:
+        #        pt = np.squeeze(np.array(line, dtype=int))
+        #        color = (255,255,255)
+        #        cv2.line(imgc, pt[:2], pt[2:], color, 2)
+        #    cv2.imshow('lines', imgc)
+        #    cv2.waitKey(0)
 
         for clst in range(2):
             reduced_cluster = []
@@ -402,18 +411,30 @@ class VPDetection(object):
             end_idx = []
             groups = np.ones(len(dist)) *-1
             matched = []
-            visited = []
             edge_lines = []
+            imgc =toColorImage(img)
+            #for line in lines_:
+            #    pt = np.squeeze(np.array(line, dtype=int))
+            #    cv2.line(imgc, pt[:2], pt[2:], (255,255,255), 1)
+
             for node_idx in range(num_nodes):
+                visited = []
                 if groups[node_idx] == -1:
                     stack_grows = True
     
+                    #pt = np.squeeze(np.array(lines_[node_idx], dtype=int))
+                    #cv2.line(imgc, pt[:2], pt[2:], (0,0,0), 3)
+
                     visited.append(node_idx)
                     S.append(node_idx)
                     while len(S) > 0:
                         groups[node_idx] = id
                         next_idx = next(node_idx)
                         if next_idx is not None:
+                            #pt = np.squeeze(np.array(lines_[node_idx], dtype=int))
+                            #cv2.line(imgc, pt[:2], pt[2:], (0,0,255), 3)
+
+
                             matched.append(node_idx)
                             visited.append(next_idx)
                             pred_idx[next_idx] = node_idx
@@ -433,6 +454,9 @@ class VPDetection(object):
                                 stack_grows = True
                             if node_idx not in end_idx:
                                S.append(node_idx)
+                        #cv2.imshow('lines', imgc)
+                        #cv2.waitKey(0)
+ 
                 if len(edge_lines) == 0:
                     # no go line selected
                     continue
@@ -442,15 +466,14 @@ class VPDetection(object):
                     edge_lines.append(node_idx)
 
                 reduced_cluster.append(merge_lines(lines_[edge_lines[0]], 
-                                                lines_[edge_lines[-1]]))
-
+                                                   lines_[edge_lines[-1]]))
                 #imgc = toColorImage(img)
                 edge_lines = []
 
                 #visited = list(set(matched))
                 visited = matched
                 id += 1
-            merge_lines.append(reduced_cluster)
+            merged_lines.append(reduced_cluster)
         #imgc = toColorImage(img) 
         #for line in merged_lines:
         #    color = (np.random.randint(255),
@@ -583,7 +606,10 @@ class VPDetection(object):
         num_bins_lon = int(long_span / bin_size)
 
         # Get indices for every unique pair of lines
-        combos = list(combinations(range(self.__lines.shape[0]), 2))
+        #combos_old = list(combinations(range(self.__lines.shape[0]), 2))
+        combos_v = list(combinations(range(self.__lines_v.shape[0]),2))
+        combos_h = list(combinations(range(self.__lines_h.shape[0]),2))
+        combos = combos_v + combos_h
         combos = np.asarray(combos, dtype=int)
 
         # For each pair, determine where the lines intersect
