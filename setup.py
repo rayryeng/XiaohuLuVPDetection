@@ -2,13 +2,12 @@
 """
 setup.py file for installing the VP detection package.
 
-Heavily borrowed from Kenneth Reitz -
-https://github.com/kennethreitz/setup.py
+Heavily borrowed from Navdeep Gill -
+https://github.com/navdeep-G/setup.py
 """
 
 import io
 import os
-import sys
 
 from setuptools import find_packages, setup
 
@@ -18,7 +17,7 @@ DESCRIPTION = "Xiaohu Lu's Vanishing Point Detection algorithm"
 URL = 'https://github.com/rayryeng/XiaohuLuVPDetection'
 EMAIL = 'rphan@ryerson.ca'
 AUTHOR = 'Ray Phan'
-REQUIRES_PYTHON = '>=3.5.0'
+REQUIRES_PYTHON = '>= 3.4, <= 3.7'
 VERSION = None
 
 # Required packages
@@ -56,7 +55,7 @@ setup(
     packages=find_packages(
         exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
-    #py_modules=['lu_vp_detect'],
+    # py_modules=['lu_vp_detect'],
     entry_points={
         'console_scripts': ['run_vp_detect=lu_vp_detect.run_vp_detect:main'],
     },
@@ -68,9 +67,10 @@ setup(
         # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: Implementation :: CPython',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: Implementation :: PyPy'
     ],
 )

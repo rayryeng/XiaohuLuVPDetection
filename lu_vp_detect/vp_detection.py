@@ -1,6 +1,7 @@
 """
 Python + OpenCV Implementation of the vanishing point algorithm by Xiaohu Lu
-et al. - http://xiaohulugo.github.io/papers/Vanishing_Point_Detection_WACV2017.pdf.
+et al. -
+http://xiaohulugo.github.io/papers/Vanishing_Point_Detection_WACV2017.pdf.
 
 Author: Ray Phan (https://github.com/rayryeng)
 """
@@ -51,9 +52,9 @@ class VPDetection(object):
         self._vps = None  # For storing the VPs in 3D space
         self._vps_2D = None  # For storing the VPs in 2D space
         self.__img = None  # Stores the image locally
-        self.__clusters = None  # Stores which line index corresponds to what VP
+        self.__clusters = None  # Stores which line index maps to what VP
         self.__tol = 1e-8  # Tolerance for floating point comparison
-        self.__angle_tol = np.pi / 3  # (pi / 180 * (60 degrees)) --> +/- 30 deg
+        self.__angle_tol = np.pi / 3  # (pi / 180 * (60 degrees)) = +/- 30 deg
         self.__lines = None  # Stores the line detections internally
         self.__zero_value = 0.001  # Threshold to check augmented coordinate
         # Anything less than __tol gets set to this
@@ -110,10 +111,12 @@ class VPDetection(object):
         Principal point for VP Detection algorithm
 
         Args:
-            value: A list or tuple of two elements denoting the x and y coordinates
+            value: A list or tuple of two elements denoting the x and y
+           coordinates
 
         Raises:
-            ValueError: If the input is not a list or tuple and there aren't two elements
+            ValueError: If the input is not a list or tuple and there aren't
+            two elements
         """
         try:
             assert isinstance(value,
@@ -156,7 +159,8 @@ class VPDetection(object):
         Vanishing points of the image in 3D space.
 
         Returns:
-            A numpy array where each row is a point and each column is a component / coordinate
+            A numpy array where each row is a point and each column is a
+            component / coordinate
         """
         return self._vps
 
@@ -166,7 +170,8 @@ class VPDetection(object):
         Vanishing points of the image in 2D image coordinates.
 
         Returns:
-            A numpy array where each row is a point and each column is a component / coordinate
+            A numpy array where each row is a point and each column is a
+            component / coordinate
         """
         return self._vps_2D
 
@@ -776,13 +781,14 @@ class VPDetection(object):
         Find the vanishing points given the input image
 
         Args:
-            img: Either the path to the image or the image read in with `cv2.imread`
+            img: Either the path to the image or the image read in with
+         `cv2.imread`
 
         Returns:
-            A numpy array where each row is a point and each column is a component / coordinate.
-            Additionally, the VPs are ordered such that the right most VP is the
-            first row, the left most VP is the second row and the vertical VP is
-            the last row
+            A numpy array where each row is a point and each column is a
+            component / coordinate. Additionally, the VPs are ordered such that
+            the right most VP is the first row, the left most VP is the second
+            row and the vertical VP is the last row
         """
 
         # Detect the lines in the image
@@ -797,7 +803,7 @@ class VPDetection(object):
                                              dtype=np.float32)
 
         # Detect lines
-        lines = self.__detect_lines(img)
+        _ = self.__detect_lines(img)
 
         # Find VP candidates
         vps_hypos = self.__find_vp_hypotheses_two_lines()
