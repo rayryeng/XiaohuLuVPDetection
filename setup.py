@@ -17,11 +17,11 @@ DESCRIPTION = "Xiaohu Lu's Vanishing Point Detection algorithm"
 URL = 'https://github.com/rayryeng/XiaohuLuVPDetection'
 EMAIL = 'rphan@ryerson.ca'
 AUTHOR = 'Ray Phan'
-REQUIRES_PYTHON = '>= 3.4, <= 3.7'
+REQUIRES_PYTHON = '>= 3.8, <= 3.10'
 VERSION = None
 
 # Required packages
-REQUIRED = ['numpy', 'opencv-contrib-python==4.0.0.21']
+REQUIRED = ['numpy', 'opencv-contrib-python']
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -67,10 +67,9 @@ setup(
         # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: Implementation :: PyPy'
     ],
 )
