@@ -2,7 +2,7 @@
 This is a Python + OpenCV implementation of the Vanishing Point algorithm by Xiaohu Lu et al. - http://xiaohulugo.github.io/papers/Vanishing_Point_Detection_WACV2017.pdf
 
 # Requirements
-* Python 3.8 to 3.10
+* Python >= 3.8
 * OpenCV Contrib 4.x
 * NumPy
 
