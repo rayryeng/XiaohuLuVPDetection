@@ -17,7 +17,7 @@ DESCRIPTION = "Xiaohu Lu's Vanishing Point Detection algorithm"
 URL = 'https://github.com/rayryeng/XiaohuLuVPDetection'
 EMAIL = 'rphan@ryerson.ca'
 AUTHOR = 'Ray Phan'
-REQUIRES_PYTHON = '>= 3.8, <= 3.10'
+REQUIRES_PYTHON = '>= 3.8'
 VERSION = None
 
 # Required packages
@@ -70,6 +70,7 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: Implementation :: PyPy'
     ],
 )
