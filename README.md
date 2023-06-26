@@ -178,7 +178,8 @@ img = './test_image.jpg'
 
 vpd = VPDetection(length_thresh, principal_point, focal_length, seed)
 vps = vpd.find_vps(img)
-print(vps)
+print(vps) # 3D vanishing points
+print(vpd.vps_2D) # 2D vanishing points
 ```
 
 We get the following output and debug image:
